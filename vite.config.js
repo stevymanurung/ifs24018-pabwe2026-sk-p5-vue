@@ -3,12 +3,34 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 import process from "process";
 
+// Sisipkan CSS entry langsung ke HTML saat build agar tidak menjadi render-blocking request.
+const inlineEntryCss = () => ({
+  name: "inline-entry-css",
+  apply: "build",
+  enforce: "post",
+  transformIndexHtml: {
+    order: "post",
+    handler(html, { bundle }) {
+      return html.replace(
+        /<link rel="stylesheet"[^>]*href="([^"]+\.css)"[^>]*>/g,
+        (tag, href) => {
+          const key = Object.keys(bundle).find((name) => href.endsWith(name));
+          if (!key) return tag;
+          const css = String(bundle[key].source);
+          delete bundle[key];
+          return `<style>${css}</style>`;
+        }
+      );
+    },
+  },
+});
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
-    plugins: [vue(), tailwindcss()],
+    plugins: [vue(), tailwindcss(), inlineEntryCss()],
     server: {
       port: Number(env.APP_PORT) || 3000,
     },
